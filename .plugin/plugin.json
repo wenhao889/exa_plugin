@@ -1,0 +1,14 @@
+{
+  "name": "secret-guard",
+  "version": "1.0.0",
+  "description": "Sample plugin: blocks terminal commands that would print or read secrets, and writes an audit trail of every tool call",
+  "author": {
+    "name": "Example Author",
+    "email": "author@example.com"
+  },
+  "homepage": "https://github.com/example/secret-guard",
+  "repository": "https://github.com/example/secret-guard",
+  "license": "MIT",
+  "keywords": ["sample", "hooks", "secrets", "audit", "security"],
+  "entry_command": "audit"
+}
