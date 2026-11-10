@@ -1,14 +1,13 @@
 {
-  "name": "secret-guard",
+  "name": "wlin-plugin",
   "version": "1.0.0",
-  "description": "Sample plugin: blocks terminal commands that would print or read secrets, and writes an audit trail of every tool call",
+  "description": "Sample plugin: for a simple coding-review-qa/test workflow",
   "author": {
     "name": "Example Author",
     "email": "author@example.com"
   },
-  "homepage": "https://github.com/example/secret-guard",
-  "repository": "https://github.com/example/secret-guard",
+  "homepage": "https://github.com/wenhao889/exa_plugin.git ",
+  "repository": "https://github.com/wenhao889/exa_plugin.git ",
   "license": "MIT",
-  "keywords": ["sample", "hooks", "secrets", "audit", "security"],
-  "entry_command": "audit"
+  "keywords": ["sample", "coding", "review", "qa"]
 }

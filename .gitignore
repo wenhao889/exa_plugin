@@ -1,6 +1,3 @@
-# Audit log written by the PostToolUse hook
-.openhands/secret-guard/
-
 # Local env files never belong in a repo
 .env
 .env.*

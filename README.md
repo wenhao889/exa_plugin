@@ -1,21 +1,18 @@
 # secret-guard
 
-A small, complete **OpenHands plugin** you can copy as a starting point. It has
-one of every component a plugin can ship, and each component does something
-real rather than printing a placeholder:
+A small **OpenHands plugin** you can copy as a starting point. It has the
+components that matter in practice - manifest, marketplace catalog, skill and
+three agents - and each does something real rather than printing a placeholder:
 
 | Component | File | What it does |
 | --- | --- | --- |
-| Manifest | `.plugin/plugin.json` | Name, version, entry command |
+| Manifest | `.plugin/plugin.json` | Name, version, description |
 | Marketplace | `.plugin/marketplace.json` | Catalog entry so the repo loads as a marketplace, not as skills only |
 | Skill | `skills/code-style/SKILL.md` | Requirements for writing maintainable code, used by the `implementer` agent |
-| Hook | `hooks/hooks.json` + `scripts/block_secret_access.py` | `PreToolUse`: denies tool calls that would print or read secrets |
-| Hook | `hooks/hooks.json` + `scripts/log_tool_use.py` | `PostToolUse`: appends a redacted audit line for every tool call |
-| Command | `commands/audit.md` | `/secret-guard:audit` summarizes the audit log |
 | Agents | `agents/implementer.md`, `reviewer.md`, `test-writer.md` | Delegate targets: write code, review it, add unit tests |
 
-No dependencies beyond `python3`. Hooks are the only executable part, and they
-use the standard library.
+There is no executable code and no dependency on `python3`: everything here is
+configuration and prompts.
 
 ## Layout
 
@@ -27,24 +24,20 @@ secret-guard/
 ├── skills/
 │   └── code-style/
 │       └── SKILL.md             # one directory per skill
-├── hooks/
-│   └── hooks.json               # event -> matcher -> [{type, command, timeout}]
 ├── agents/
 │   ├── implementer.md           # writes code from a stated requirement
 │   ├── reviewer.md              # reviews a change, reports, does not edit
 │   └── test-writer.md           # adds tests and proves they can fail
-├── commands/
-│   └── audit.md                 # filename becomes the command name
-├── scripts/
-│   ├── block_secret_access.py   # PreToolUse, exit 2 to deny
-│   └── log_tool_use.py          # PostToolUse, never fails the conversation
-├── examples/
-│   └── load_plugin.py           # loads this plugin with the SDK
 └── README.md
 ```
 
-Optional component this sample deliberately omits: `.mcp.json` for MCP servers.
-It is just another file at the plugin root - add it and the loader picks it up.
+Components this sample deliberately omits:
+
+- `hooks/hooks.json` and any scripts it calls
+- `commands/` (an `.md` file there becomes `/<plugin>:<filename>`)
+- `.mcp.json` for MCP servers
+
+Each is just a file at the plugin root - add it and the loader picks it up.
 
 ## One repo, plugin and marketplace
 
@@ -58,8 +51,8 @@ Add .plugin/marketplace.json to load the whole plugin.
 
 The loader (`marketplace/registry.py`) looks for a catalog first. When it finds
 none, it falls back to `Marketplace.from_skills_dir`, which keeps only
-`<name>/SKILL.md` folders - so the hooks, command and agents are silently
-dropped even though `plugin.json` is valid. Its log line says it directly:
+`<name>/SKILL.md` folders - so the agents are silently dropped even though
+`plugin.json` is valid. Its log line says it directly:
 
 ```
 Marketplace '...' is a plugin (.plugin/plugin.json), not a marketplace;
@@ -84,9 +77,6 @@ directory after `lstrip("./")`, so `"."` becomes the repo root itself. The
 marketplace is named `exa-plugin` rather than `secret-guard` so the install
 reference reads `secret-guard@exa-plugin` instead of repeating one name twice.
 
-`examples/load_plugin.py` resolves the plugin through `MarketplaceRegistry` -
-the same path the UI uses - and fails if the source does not land on this repo.
-
 ## Load it
 
 Three ways, all equivalent:
@@ -110,7 +100,7 @@ plugin = Plugin.load("/path/to/secret-guard")
 agent = agent.model_copy(
     update={"agent_context": plugin.add_skills_to(agent.agent_context)}
 )
-conversation = Conversation(agent=agent, hook_config=plugin.hooks)
+conversation = Conversation(agent=agent)
 ```
 
 ```bash
@@ -121,10 +111,17 @@ ln -s "$PWD" ~/.agents/plugins/secret-guard
 From a git remote, `PluginSource(source="github:owner/secret-guard", ref="v1.0.0")`
 works too - pin a tag so a plugin cannot change under a running conversation.
 
-Verify the plugin parses without starting a conversation:
+To check that the catalog resolves to this repo without starting a
+conversation:
 
 ```bash
-uv run --with openhands-sdk python examples/load_plugin.py
+uv run --with openhands-sdk python -c "
+from openhands.sdk.marketplace import MarketplaceRegistration
+from openhands.sdk.marketplace.registry import MarketplaceRegistry
+
+reg = MarketplaceRegistry([MarketplaceRegistration(name='exa-plugin', source='.')])
+print(reg.list_plugins(), reg.resolve_plugin('secret-guard').source)
+"
 ```
 
 ## The three agents
@@ -187,9 +184,8 @@ Skill 'code-style' not found but was given to agent 'implementer'.
 So the frontmatter stays free of `skills:`, the implementer carries the
 checklist in its prompt, and the skill file remains the canonical, longer text.
 If you install `code-style` into `.agents/skills/code-style/` at project level,
-you can move the name back into a `skills:` field. `examples/load_plugin.py`
-now runs registration and fails loudly if any agent was skipped, because this
-failure mode is otherwise just a log line.
+you can move the name back into a `skills:` field. The skip is only a warning,
+so re-read the load log after editing any agent's frontmatter.
 
 The skill is also a keyword-triggered skill, so the main agent picks it up on
 words like "code style" or "naming" - one file, usable by both.
@@ -197,81 +193,6 @@ words like "code style" or "naming" - one file, usable by both.
 The `reviewer` is intentionally not bound to it: a reviewer that shares the
 author's checklist grades its own homework. It judges the result against the
 request instead.
-
-## How the hooks work
-
-`openhands.sdk` passes each hook its event as JSON on **stdin**, and reads the
-result from **stdout** plus the exit code:
-
-| Exit code | Meaning |
-| --- | --- |
-| `0` | allow; stdout may carry `{"decision", "reason", "additionalContext"}` |
-| `2` | **block** - the printed `reason` goes back to the agent |
-| anything else | non-blocking error: logged, the call still runs |
-
-Only `2` blocks. Exit `1` - the usual Unix failure code - lets the call
-through, which is the single easiest hook bug to ship.
-
-`block_secret_access.py` denies:
-
-- `printenv`, `env`, `env | sort` - whole-environment dumps
-- a reading command (`cat`, `grep`, `head`, `base64`, `cp`, ...) applied to a
-  credential path: `.env`, `.env.*`, `.envrc`, `id_rsa`, `~/.ssh/*`,
-  `~/.aws/*`, `~/.netrc`, `~/.pgpass`, `~/.npmrc`, `~/.kube/config`
-- `file_editor` reads of those same paths
-
-It allows everything else, including `ls .env` - listing a file reveals no
-values. (`grep -o '^[A-Z_]*=' .env` is denied too: the policy is that the
-secret file is never read, so `.env.example` carries the variable names.)
-Malformed hook input fails **open** (allow, with a note) so a parser bug cannot
-wedge a conversation.
-
-`log_tool_use.py` is registered with `"async": true`, so it never delays the
-agent. It writes JSONL to `.openhands/secret-guard/audit.jsonl` and redacts
-common key shapes (`sk-...`, `ghp_...`, `AKIA...`, `token=...`,
-`Bearer ...`) before writing. Every failure path exits 0 on purpose: an
-unwritable log must not break the user's turn.
-
-Environment variables available to a plugin's command hooks:
-
-| Variable | Value |
-| --- | --- |
-| `PLUGIN_ROOT` | absolute path of the loaded plugin, set by the SDK |
-| `OPENHANDS_PROJECT_DIR` | the conversation's workspace |
-| `OPENHANDS_TOOL_NAME` | the tool the hook belongs to (e.g. `terminal`) |
-
-That is why `hooks.json` addresses its scripts as
-`python3 "$PLUGIN_ROOT/scripts/block_secret_access.py"` rather than a relative
-path: the plugin may be loaded from a cache directory, and the hook runs with
-the workspace as its working directory.
-
-## Test the hooks by hand
-
-Feed an event on stdin and check the exit code:
-
-```bash
-# deny -> prints {"decision": "deny", ...}, exit 2
-echo '{"tool_name": "terminal", "tool_input": {"command": "cat .env"}}' \
-  | PLUGIN_ROOT="$PWD" python3 scripts/block_secret_access.py; echo "exit=$?"
-
-# allow -> silent, exit 0
-echo '{"tool_name": "terminal", "tool_input": {"command": "git status"}}' \
-  | PLUGIN_ROOT="$PWD" python3 scripts/block_secret_access.py; echo "exit=$?"
-
-# audit line
-echo '{"tool_name": "terminal", "tool_input": {"command": "curl -H \"Authorization: Bearer abc123456789\" example.com"}}' \
-  | OPENHANDS_PROJECT_DIR="$PWD" python3 scripts/log_tool_use.py
-tail -n 1 .openhands/secret-guard/audit.jsonl
-```
-
-## Limits worth knowing
-
-This is a sample, not a sandbox. It pattern-matches commands, so it stops
-accidents and obvious mistakes, not a determined agent: `python -c` reading the
-file directly, `git show HEAD:.env`, or a renamed copy all slip past. Real
-secrets policy belongs in what the agent is *given* - scoped tokens, a
-workspace without the credential file - with hooks as a second layer and the
-audit log as evidence of what happened.
 
 ## License
 
