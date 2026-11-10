@@ -1,5 +1,5 @@
 {
-  "name": "exa-plugin",
+  "name": "wlin-market",
   "owner": {
     "name": "Example Author",
     "email": "author@example.com"
@@ -7,7 +7,7 @@
   "description": "Sample OpenHands plugin: a code-style skill and three agents for implementing, reviewing and testing code",
   "plugins": [
     {
-      "name": "wlin_plugin",
+      "name": "wlin-plugin",
       "source": ".",
       "description": "Ships a code-style skill plus implementer, reviewer and test-writer agents",
       "version": "1.0.0",
