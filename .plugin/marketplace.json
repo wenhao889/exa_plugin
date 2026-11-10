@@ -1,0 +1,22 @@
+{
+  "name": "exa-plugin",
+  "owner": {
+    "name": "Example Author",
+    "email": "author@example.com"
+  },
+  "description": "Sample OpenHands plugin: hooks, a code-style skill, a slash command and three delegate agents",
+  "plugins": [
+    {
+      "name": "secret-guard",
+      "source": ".",
+      "description": "Denies credential reads with a PreToolUse hook, keeps a redacted audit log, and ships implementer, reviewer and test-writer agents",
+      "version": "1.0.0",
+      "author": {
+        "name": "Example Author"
+      },
+      "entry_command": "audit",
+      "license": "MIT",
+      "keywords": ["sample", "hooks", "secrets", "audit", "security"]
+    }
+  ]
+}
