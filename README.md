@@ -64,7 +64,7 @@ The catalog lists the plugin at the repo root:
 
 ```json
 {
-  "name": "exa-plugin",
+  "name": "wlin-plugin",
   "owner": { "name": "Example Author" },
   "plugins": [
     { "name": "secret-guard", "source": ".", "version": "1.0.0" }
