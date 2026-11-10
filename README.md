@@ -1,4 +1,4 @@
-# secret-guard
+# wlin-plugin
 
 A small **OpenHands plugin** you can copy as a starting point. It has the
 components that matter in practice - manifest, marketplace catalog, skill and
