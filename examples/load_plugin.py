@@ -11,6 +11,8 @@ No API key is needed: this only exercises plugin parsing, not a conversation.
 import tempfile
 from pathlib import Path
 
+from openhands.sdk.marketplace import MarketplaceRegistration
+from openhands.sdk.marketplace.registry import MarketplaceRegistry
 from openhands.sdk.plugin import Plugin
 from openhands.sdk.subagent.registry import register_plugin_agents
 
@@ -58,6 +60,21 @@ assert "code-style" in skill_names, f"code-style skill missing, got {skill_names
 assert plugin.commands, "no commands loaded from commands/"
 assert len(plugin.agents) == 3, f"expected 3 agents, got {len(plugin.agents)}"
 assert hooks.pre_tool_use and hooks.post_tool_use, "expected both hook events"
+
+# The repo is also a marketplace, which is how the UI loads it. Resolve through
+# the registry the way the UI does: without .plugin/marketplace.json, the loader
+# falls back to a skills-only folder and the hooks, commands and agents are
+# dropped, even though the plugin itself parses perfectly.
+print("\nmarketplace:")
+registry = MarketplaceRegistry(
+    [MarketplaceRegistration(name="exa-plugin", source=str(PLUGIN_DIR))]
+)
+print(f"  listed plugins: {registry.list_plugins()}")
+resolved = registry.resolve_plugin("secret-guard")
+print(f"  resolved source: {resolved.source}")
+assert Path(resolved.source).resolve() == PLUGIN_DIR.resolve(), (
+    f"marketplace source resolved to {resolved.source}, expected {PLUGIN_DIR}"
+)
 
 # Registering is the real test: a definition that names a skill the SDK cannot
 # resolve is skipped with a warning, and that agent silently disappears from the

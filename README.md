@@ -7,6 +7,7 @@ real rather than printing a placeholder:
 | Component | File | What it does |
 | --- | --- | --- |
 | Manifest | `.plugin/plugin.json` | Name, version, entry command |
+| Marketplace | `.plugin/marketplace.json` | Catalog entry so the repo loads as a marketplace, not as skills only |
 | Skill | `skills/code-style/SKILL.md` | Requirements for writing maintainable code, used by the `implementer` agent |
 | Hook | `hooks/hooks.json` + `scripts/block_secret_access.py` | `PreToolUse`: denies tool calls that would print or read secrets |
 | Hook | `hooks/hooks.json` + `scripts/log_tool_use.py` | `PostToolUse`: appends a redacted audit line for every tool call |
@@ -21,7 +22,8 @@ use the standard library.
 ```
 secret-guard/
 ├── .plugin/
-│   └── plugin.json              # manifests: OpenHands reads .plugin/ or .claude-plugin/
+│   ├── plugin.json              # manifests: OpenHands reads .plugin/ or .claude-plugin/
+│   └── marketplace.json         # catalog: makes this repo installable as a marketplace
 ├── skills/
 │   └── code-style/
 │       └── SKILL.md             # one directory per skill
@@ -43,6 +45,47 @@ secret-guard/
 
 Optional component this sample deliberately omits: `.mcp.json` for MCP servers.
 It is just another file at the plugin root - add it and the loader picks it up.
+
+## One repo, plugin and marketplace
+
+Adding this repository as a plugin source without `.plugin/marketplace.json`
+gives:
+
+```
+This plugin has no marketplace file, so only its skills will load.
+Add .plugin/marketplace.json to load the whole plugin.
+```
+
+The loader (`marketplace/registry.py`) looks for a catalog first. When it finds
+none, it falls back to `Marketplace.from_skills_dir`, which keeps only
+`<name>/SKILL.md` folders - so the hooks, command and agents are silently
+dropped even though `plugin.json` is valid. Its log line says it directly:
+
+```
+Marketplace '...' is a plugin (.plugin/plugin.json), not a marketplace;
+only its skills are loaded, and its hooks, MCP servers, commands and agents
+are ignored
+```
+
+The catalog lists the plugin at the repo root:
+
+```json
+{
+  "name": "exa-plugin",
+  "owner": { "name": "Example Author" },
+  "plugins": [
+    { "name": "secret-guard", "source": ".", "version": "1.0.0" }
+  ]
+}
+```
+
+`"source": "."` is intentional: entries are resolved against the marketplace
+directory after `lstrip("./")`, so `"."` becomes the repo root itself. The
+marketplace is named `exa-plugin` rather than `secret-guard` so the install
+reference reads `secret-guard@exa-plugin` instead of repeating one name twice.
+
+`examples/load_plugin.py` resolves the plugin through `MarketplaceRegistry` -
+the same path the UI uses - and fails if the source does not land on this repo.
 
 ## Load it
 
